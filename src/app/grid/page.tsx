@@ -1,36 +1,61 @@
 "use client";
 
-import React, { useCallback, useMemo, useRef, useState } from "react";
-import { RowSelectionModule } from 'ag-grid-community';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import { RowSelectionModule } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
+import { useQueryState } from "nuqs";
 import applications from "../../../sample-applications.json";
 import { Input } from "@/components/ui/input";
-import { Download, SearchIcon, ChevronDown } from 'lucide-react';
+import { Download, SearchIcon, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-
 import {
   ClientSideRowModelModule,
   PaginationModule,
   CellStyleModule,
-  GridOptions,
+  CsvExportModule,
   ModuleRegistry,
-  QuickFilterModule,
-  CsvExportModule
+  GridStateModule
 } from "ag-grid-community";
 
 ModuleRegistry.registerModules([
-  QuickFilterModule,
   ClientSideRowModelModule,
   PaginationModule,
   CellStyleModule,
   RowSelectionModule,
-  CsvExportModule
+  CsvExportModule,
+  GridStateModule
 ]);
 
 export default function Page() {
   const gridRef = useRef<AgGridReact<any>>(null);
 
+  //nuqs state management
+  const [searchName, setSearchName] = useQueryState("search", { history: "push", defaultValue: "" });
+  const [page, setPage] = useQueryState("page", { history: "push", defaultValue: "1" });
+  const [pageSize, setPageSize] = useQueryState("pageSize", { history: "push", defaultValue: "20" });
+  const [hiddenColumns, setHiddenColumns] = useQueryState<string[]>("hiddenColumns", {
+    history: "push",
+    parse: (value) => (value ? value.split(",") : []),
+    serialize: (value) => value.join(","),
+    defaultValue: []
+  });
+
+  const [sortModel, setSortModel] = useQueryState("sort", {
+    history: "push",
+    parse: (value) => (value ? JSON.parse(decodeURIComponent(value)) : []),
+    serialize: (value) => encodeURIComponent(JSON.stringify(value)),
+    defaultValue: [],
+  });
+
+  // const [filterModel, setFilterModel] = useQueryState("filters", {
+  //   history: "push",
+  //   parse: (value) => (value ? JSON.parse(decodeURIComponent(value)) : {}),
+  //   serialize: (value) => encodeURIComponent(JSON.stringify(value)),
+  //   defaultValue: {},
+  // });
+
+  // Get skill names from data
   const skillNames = useMemo(() => {
     const skillsSet = new Set<string>();
     applications.forEach((app) => {
@@ -40,20 +65,25 @@ export default function Page() {
   }, []);
 
   const staticColumns = ["name", "email", "location", "ctc", "applicationStatus"];
+  const allColumns = [...staticColumns, ...skillNames];
 
-  const [visibleColumns, setVisibleColumns] = useState<string[]>([...staticColumns, ...skillNames]);
 
+  //search filter
   const onFilterTextBoxChanged = useCallback(() => {
-    gridRef.current!.api.setGridOption(
+    gridRef.current?.api.setGridOption(
       "quickFilterText",
-      (document.getElementById("filter-text-box") as HTMLInputElement).value,
+      (document.getElementById("filter-text-box") as HTMLInputElement).value
     );
   }, []);
 
+  //export button
   const onBtnExport = useCallback(() => {
-    gridRef.current!.api.exportDataAsCsv();
+    gridRef.current?.api.exportDataAsCsv();
   }, []);
 
+
+
+  //showing skills as columns (grid)
   const rowData = useMemo(() => {
     return applications.map((app) => {
       const row: { [key: string]: string | number } = {
@@ -61,7 +91,7 @@ export default function Page() {
         email: app.email,
         location: app.location,
         ctc: app.ctc,
-        applicationStatus: app.applicationStatus,
+        applicationStatus: app.applicationStatus
       };
       skillNames.forEach((skillName) => {
         const skill = app.skills.find((skill) => skill.name === skillName);
@@ -73,28 +103,43 @@ export default function Page() {
 
   const colDefs = useMemo(() => {
     const staticCols = [
-      { headerName: "Name", field: "name", pinned: "left", suppressMovable: true, hide: !visibleColumns.includes("name") },
-      { headerName: "Email", field: "email", pinned: "left", suppressMovable: true, hide: !visibleColumns.includes("email") },
-      { headerName: "Location", field: "location", hide: !visibleColumns.includes("location") },
-      { headerName: "CTC", field: "ctc", hide: !visibleColumns.includes("ctc") },
-      { headerName: "Application Status", field: "applicationStatus", hide: !visibleColumns.includes("applicationStatus") },
+      { headerName: "Name", field: "name", hide: hiddenColumns.includes("name"), filter: "agTextColumnFilter" },
+      { headerName: "Email", field: "email", hide: hiddenColumns.includes("email"), filter: "agTextColumnFilter" },
+      { headerName: "Location", field: "location", hide: hiddenColumns.includes("location"), filter: "agTextColumnFilter" },
+      { headerName: "CTC", field: "ctc", hide: hiddenColumns.includes("ctc"), filter: "agNumberColumnFilter" },
+      { headerName: "Application Status", field: "applicationStatus", hide: hiddenColumns.includes("applicationStatus"), filter: "agSetColumnFilter" }
     ];
 
     const skillCols = skillNames.map((skill) => ({
       headerName: skill,
       field: skill,
-      cellStyle: { textAlign: "left" },
-      hide: !visibleColumns.includes(skill),
+      hide: hiddenColumns.includes(skill),
+      filter: "agNumberColumnFilter" // Skills are numeric (years of experience)
     }));
 
     return [...staticCols, ...skillCols];
-  }, [skillNames, visibleColumns]);
+  }, [skillNames, hiddenColumns]);
 
+
+
+
+  //toogle columns
   const toggleColumn = (columnName: string) => {
-    setVisibleColumns((prev) =>
-      prev.includes(columnName) ? prev.filter((col) => col !== columnName) : [...prev, columnName]
-    );
+    setHiddenColumns((prev) => {
+      const updatedHiddenColumns = prev.includes(columnName)
+        ? prev.filter((col) => col !== columnName)
+        : [...prev, columnName];
+
+      return updatedHiddenColumns.length > 0 ? updatedHiddenColumns : null;
+    });
   };
+
+
+  useEffect(() => {
+    if (gridRef.current) {
+      gridRef.current?.api?.paginationGoToPage(Number(page) - 1);
+    }
+  }, [page]);
 
   return (
     <div className="flex flex-col h-screen p-6 bg-gray-50">
@@ -111,7 +156,9 @@ export default function Page() {
           <Input
             type="text"
             id="filter-text-box"
-            placeholder="Search candidates..."
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+            placeholder="Search "
             onInput={onFilterTextBoxChanged}
             className="pl-10 pr-4 py-2 border border-gray-300 rounded-md w-full bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -120,45 +167,47 @@ export default function Page() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="flex items-center space-x-2">
-              <span>Toggle Columns</span>
+              <span>Hide Columns</span>
               <ChevronDown className="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64 p-2">
-            {staticColumns.map((column) => (
+            {allColumns.map((column) => (
               <DropdownMenuCheckboxItem
                 key={column}
-                checked={visibleColumns.includes(column)}
+                checked={!hiddenColumns.includes(column)}
                 onCheckedChange={() => toggleColumn(column)}
               >
                 {column}
-              </DropdownMenuCheckboxItem>
-            ))}
-            <hr className="my-2" />
-            {skillNames.map((skill) => (
-              <DropdownMenuCheckboxItem
-                key={skill}
-                checked={visibleColumns.includes(skill)}
-                onCheckedChange={() => toggleColumn(skill)}
-              >
-                {skill}
               </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      <div className="ag-theme-alpine h-full rounded-lg shadow-sm">
+      <div className="h-full rounded-lg shadow-sm">
         <AgGridReact
           ref={gridRef}
           rowData={rowData}
           columnDefs={colDefs}
           pagination={true}
-          paginationPageSize={20}
-          domLayout="autoHeight"
+          paginationPageSize={Number(pageSize)}
+          defaultColDef={{ sortable: true, filter: true }}
+          onPaginationChanged={() => {
+            if (gridRef.current) {
+              setPage((gridRef.current?.api?.paginationGetCurrentPage() + 1).toString());
+            }
+          }}
+          onSortChanged={() => {
+            if (gridRef.current) {
+              console.log(gridRef.current.api.getState().sort?.sortModel[0].sort);
+
+              const sortState = gridRef.current.api.getState().sort?.sortModel[0].sort;
+              setSortModel(sortState === undefined ? null : sortState);
+            }
+          }}
         />
       </div>
     </div>
   );
 }
-``
