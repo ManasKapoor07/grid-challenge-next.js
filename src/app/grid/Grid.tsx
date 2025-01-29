@@ -1,6 +1,5 @@
 "use client";
-
-import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import React, { useCallback, useMemo, useRef, useEffect } from "react";
 import { RowSelectionModule } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import { useQueryState } from "nuqs";
@@ -15,6 +14,7 @@ import {
   CellStyleModule,
   CsvExportModule,
   ModuleRegistry,
+  QuickFilterModule,
   GridStateModule
 } from "ag-grid-community";
 
@@ -24,11 +24,13 @@ ModuleRegistry.registerModules([
   CellStyleModule,
   RowSelectionModule,
   CsvExportModule,
-  GridStateModule
+  GridStateModule,
+  QuickFilterModule
 ]);
 
-export default function Page() {
-  const gridRef = useRef<AgGridReact<any>>(null);
+
+export default function Grid() {
+  const gridRef = useRef<AgGridReact<{ [key: string]: string | number }>>(null);
 
   //nuqs state management
   const [searchName, setSearchName] = useQueryState("search", { history: "push", defaultValue: "" });
@@ -43,10 +45,12 @@ export default function Page() {
 
   const [sortModel, setSortModel] = useQueryState("sort", {
     history: "push",
-    parse: (value) => (value ? JSON.parse(decodeURIComponent(value)) : []),
-    serialize: (value) => encodeURIComponent(JSON.stringify(value)),
+    parse: (value) => (value ? JSON.parse((value)) : []),
+    serialize: (value) => ((value)),
     defaultValue: [],
   });
+  console.log(sortModel); 
+
 
 
   // Get skill names from data
@@ -60,7 +64,6 @@ export default function Page() {
 
   const staticColumns = ["name", "email", "location", "ctc", "applicationStatus"];
   const allColumns = [...staticColumns, ...skillNames];
-
 
   //search filter
   const onFilterTextBoxChanged = useCallback(() => {
@@ -221,23 +224,22 @@ export default function Page() {
           paginationPageSize={Number(pageSize)}
           defaultColDef={{
             sortable: true,
-            filter: true, 
-            floatingFilter: true, 
+            filter: true,
+            floatingFilter: true,
           }}
-
           onPaginationChanged={() => {
             if (gridRef.current) {
+              setPageSize(gridRef.current?.api?.paginationGetPageSize().toString());
+
               setPage((gridRef.current?.api?.paginationGetCurrentPage() + 1).toString());
             }
           }}
           onSortChanged={() => {
             if (gridRef.current) {
               console.log(gridRef.current.api.getState().sort?.sortModel[0].sort);
-
               const sortState = gridRef.current.api.getState().sort?.sortModel[0].sort;
               const colId = gridRef.current.api.getState().sort?.sortModel[0].colId;
-
-              setSortModel(sortState === undefined ? null : sortState + ' col ' + colId);
+              setSortModel(sortState === undefined ? null : sortState + ' ' + colId);
             }
           }}
         />

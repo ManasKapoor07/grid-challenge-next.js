@@ -1,9 +1,12 @@
-import Page from "./grid/page";
+"use client";
 
-export default function Home() {
+import React, { Suspense } from "react";
+import Grid from "./grid/Grid"; 
+
+export default function Page() {
   return (
-    <div className="">
-      <Page />
-    </div>
+    <Suspense fallback={<div>Loading...</div>}>
+      <Grid />
+    </Suspense>
   );
 }
