@@ -48,12 +48,6 @@ export default function Page() {
     defaultValue: [],
   });
 
-  // const [filterModel, setFilterModel] = useQueryState("filters", {
-  //   history: "push",
-  //   parse: (value) => (value ? JSON.parse(decodeURIComponent(value)) : {}),
-  //   serialize: (value) => encodeURIComponent(JSON.stringify(value)),
-  //   defaultValue: {},
-  // });
 
   // Get skill names from data
   const skillNames = useMemo(() => {
@@ -103,22 +97,55 @@ export default function Page() {
 
   const colDefs = useMemo(() => {
     const staticCols = [
-      { headerName: "Name", field: "name", hide: hiddenColumns.includes("name"), filter: "agTextColumnFilter" },
-      { headerName: "Email", field: "email", hide: hiddenColumns.includes("email"), filter: "agTextColumnFilter" },
-      { headerName: "Location", field: "location", hide: hiddenColumns.includes("location"), filter: "agTextColumnFilter" },
-      { headerName: "CTC", field: "ctc", hide: hiddenColumns.includes("ctc"), filter: "agNumberColumnFilter" },
-      { headerName: "Application Status", field: "applicationStatus", hide: hiddenColumns.includes("applicationStatus"), filter: "agSetColumnFilter" }
+      {
+        headerName: "Name",
+        field: "name",
+        hide: hiddenColumns.includes("name"),
+        filter: "agTextColumnFilter",
+        floatingFilter: true, // Enables inline filtering
+        filterParams: { debounceMs: 200 }, // Adds delay for smoother filtering
+      },
+      {
+        headerName: "Email",
+        field: "email",
+        hide: hiddenColumns.includes("email"),
+        filter: "agTextColumnFilter",
+        floatingFilter: true,
+      },
+      {
+        headerName: "Location",
+        field: "location",
+        hide: hiddenColumns.includes("location"),
+        filter: "agTextColumnFilter",
+        floatingFilter: true,
+      },
+      {
+        headerName: "CTC",
+        field: "ctc",
+        hide: hiddenColumns.includes("ctc"),
+        filter: "agNumberColumnFilter",
+        floatingFilter: true,
+      },
+      {
+        headerName: "Application Status",
+        field: "applicationStatus",
+        hide: hiddenColumns.includes("applicationStatus"),
+        filter: "agSetColumnFilter",
+        floatingFilter: true,
+      },
     ];
 
     const skillCols = skillNames.map((skill) => ({
       headerName: skill,
       field: skill,
       hide: hiddenColumns.includes(skill),
-      filter: "agNumberColumnFilter" // Skills are numeric (years of experience)
+      filter: "agNumberColumnFilter",
+      floatingFilter: true,
     }));
 
     return [...staticCols, ...skillCols];
   }, [skillNames, hiddenColumns]);
+
 
 
 
@@ -192,7 +219,12 @@ export default function Page() {
           columnDefs={colDefs}
           pagination={true}
           paginationPageSize={Number(pageSize)}
-          defaultColDef={{ sortable: true, filter: true }}
+          defaultColDef={{
+            sortable: true,
+            filter: true, 
+            floatingFilter: true, 
+          }}
+
           onPaginationChanged={() => {
             if (gridRef.current) {
               setPage((gridRef.current?.api?.paginationGetCurrentPage() + 1).toString());
@@ -203,7 +235,9 @@ export default function Page() {
               console.log(gridRef.current.api.getState().sort?.sortModel[0].sort);
 
               const sortState = gridRef.current.api.getState().sort?.sortModel[0].sort;
-              setSortModel(sortState === undefined ? null : sortState);
+              const colId = gridRef.current.api.getState().sort?.sortModel[0].colId;
+
+              setSortModel(sortState === undefined ? null : sortState + ' col ' + colId);
             }
           }}
         />
