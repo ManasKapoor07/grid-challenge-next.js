@@ -15,7 +15,13 @@ import {
   CsvExportModule,
   ModuleRegistry,
   QuickFilterModule,
-  GridStateModule
+  GridStateModule,
+  ValidationModule,
+  ColumnApiModule,
+  DateFilterModule,
+  CustomFilterModule,
+  TextFilterModule,
+  NumberFilterModule
 } from "ag-grid-community";
 
 ModuleRegistry.registerModules([
@@ -25,14 +31,19 @@ ModuleRegistry.registerModules([
   RowSelectionModule,
   CsvExportModule,
   GridStateModule,
-  QuickFilterModule
+  QuickFilterModule,
+  ValidationModule,
+  ColumnApiModule,
+  DateFilterModule,
+  CustomFilterModule,
+  TextFilterModule,
+  NumberFilterModule
 ]);
-
 
 export default function Grid() {
   const gridRef = useRef<AgGridReact<{ [key: string]: string | number }>>(null);
 
-  //nuqs state management
+  // nuqs state management
   const [searchName, setSearchName] = useQueryState("search", { history: "push", defaultValue: "" });
   const [page, setPage] = useQueryState("page", { history: "push", defaultValue: "1" });
   const [pageSize, setPageSize] = useQueryState("pageSize", { history: "push", defaultValue: "20" });
@@ -45,13 +56,10 @@ export default function Grid() {
 
   const [sortModel, setSortModel] = useQueryState("sort", {
     history: "push",
-    parse: (value) => (value ? JSON.parse((value)) : []),
-    serialize: (value) => ((value)),
+    parse: (value) => (value ? JSON.parse(value) : []), // Deserialize from JSON string
+    serialize: (value) => JSON.stringify(value), // Serialize to JSON string
     defaultValue: [],
   });
-  console.log(sortModel); 
-
-
 
   // Get skill names from data
   const skillNames = useMemo(() => {
@@ -62,10 +70,31 @@ export default function Grid() {
     return Array.from(skillsSet);
   }, []);
 
-  const staticColumns = ["name", "email", "location", "ctc", "applicationStatus"];
+  const staticColumns = [
+    "createdAt",
+    "userId",
+    "jobId",
+    "name",
+    "email",
+    "location",
+    "ctc",
+    "phone",
+    "applicationStatus",
+    "employer",
+    "currentContractType",
+    "preferredWorkType",
+    "matchPercentage",
+    "offerCTC",
+    "offersInHand",
+    "overallExperience",
+    "willingToRelocate",
+    "expectedCTC",
+    "noticePeriod",
+    "attachmentFileExtension",
+  ];
   const allColumns = [...staticColumns, ...skillNames];
 
-  //search filter
+  // Search filter
   const onFilterTextBoxChanged = useCallback(() => {
     gridRef.current?.api.setGridOption(
       "quickFilterText",
@@ -73,21 +102,34 @@ export default function Grid() {
     );
   }, []);
 
-  //export button
+  // Export button
   const onBtnExport = useCallback(() => {
     gridRef.current?.api.exportDataAsCsv();
   }, []);
 
-
-
-  //showing skills as columns (grid)
+  // Showing skills as columns (grid)
   const rowData = useMemo(() => {
     return applications.map((app) => {
       const row: { [key: string]: string | number } = {
+        createdAt: app.createdAt,
+        userId: app.userId,
+        jobId: app.jobId,
         name: app.name,
         email: app.email,
         location: app.location,
         ctc: app.ctc,
+        phone: app.phone,
+        currentContractType: app.currentContractType ? app.currentContractType : "N/A",
+        employer: app.employer ? app.employer : "N/A",
+        preferredWorkType: app.preferredWorkType ? app.preferredWorkType : "N/A",
+        matchPercentage: app.matchPercentage ? app.matchPercentage : 0,
+        offerCTC: app.offerCTC ? app.offerCTC : 0,
+        offersInHand: app.offersInHand ? app.offersInHand : 0,
+        overallExperience: app.overallExperience ? app.overallExperience : 0,
+        willingToRelocate: app.willingToRelocate ? "Yes" : "No",
+        expectedCTC: app.expectedCTC ? app.expectedCTC : 0,
+        noticePeriod: app.noticePeriod ? app.noticePeriod : 0,
+        attachmentFileExtension: app.attachmentFileExtension ? app.attachmentFileExtension : "N/A",
         applicationStatus: app.applicationStatus
       };
       skillNames.forEach((skillName) => {
@@ -100,42 +142,27 @@ export default function Grid() {
 
   const colDefs = useMemo(() => {
     const staticCols = [
-      {
-        headerName: "Name",
-        field: "name",
-        hide: hiddenColumns.includes("name"),
-        filter: "agTextColumnFilter",
-        floatingFilter: true, // Enables inline filtering
-        filterParams: { debounceMs: 200 }, // Adds delay for smoother filtering
-      },
-      {
-        headerName: "Email",
-        field: "email",
-        hide: hiddenColumns.includes("email"),
-        filter: "agTextColumnFilter",
-        floatingFilter: true,
-      },
-      {
-        headerName: "Location",
-        field: "location",
-        hide: hiddenColumns.includes("location"),
-        filter: "agTextColumnFilter",
-        floatingFilter: true,
-      },
-      {
-        headerName: "CTC",
-        field: "ctc",
-        hide: hiddenColumns.includes("ctc"),
-        filter: "agNumberColumnFilter",
-        floatingFilter: true,
-      },
-      {
-        headerName: "Application Status",
-        field: "applicationStatus",
-        hide: hiddenColumns.includes("applicationStatus"),
-        filter: "agSetColumnFilter",
-        floatingFilter: true,
-      },
+      { headerName: "Date", field: "createdAt", hide: hiddenColumns.includes("createdAt"), sortable: true, filter: "agDateColumnFilter" },
+      { headerName: "User-ID", field: "userId", hide: hiddenColumns.includes("userId"), sortable: true, filter: "agTextColumnFilter" },
+      { headerName: "Job-ID", field: "jobId", hide: hiddenColumns.includes("jobId"), sortable: true, filter: "agTextColumnFilter" },
+
+      { headerName: "Name", field: "name", hide: hiddenColumns.includes("name"), sortable: true, filter: "agTextColumnFilter" },
+      { headerName: "Email", field: "email", hide: hiddenColumns.includes("email"), sortable: true, filter: "agTextColumnFilter" },
+      { headerName: "Phone", field: "phone", hide: hiddenColumns.includes("phone"), sortable: true, filter: "agTextColumnFilter" },
+      { headerName: "Location", field: "location", hide: hiddenColumns.includes("location"), sortable: true, filter: "agTextColumnFilter" },
+      { headerName: "CTC", field: "ctc", hide: hiddenColumns.includes("ctc"), sortable: true, filter: "agNumberColumnFilter" },
+      { headerName: "Employer", field: "employer", hide: hiddenColumns.includes("employer"), sortable: true, filter: "agTextColumnFilter" },
+      { headerName: "Current Contract Type", field: "currentContractType", hide: hiddenColumns.includes("currentContractType"), sortable: true, filter: "agTextColumnFilter" },
+      { headerName: "Preferred Work Type", field: "preferredWorkType", hide: hiddenColumns.includes("preferredWorkType"), sortable: true, filter: "agTextColumnFilter" },
+      { headerName: "Match Percentage", field: "matchPercentage", hide: hiddenColumns.includes("matchPercentage"), sortable: true, filter: "agNumberColumnFilter" },
+      { headerName: "Offer CTC", field: "offerCTC", hide: hiddenColumns.includes("offerCTC"), sortable: true, filter: "agNumberColumnFilter" },
+      { headerName: "Offers In Hand", field: "offersInHand", hide: hiddenColumns.includes("offersInHand"), sortable: true, filter: "agNumberColumnFilter" },
+      { headerName: "Overall Experience", field: "overallExperience", hide: hiddenColumns.includes("overallExperience"), sortable: true, filter: "agNumberColumnFilter" },
+      { headerName: "Willing to Relocate", field: "willingToRelocate", hide: hiddenColumns.includes("willingToRelocate"), sortable: true, filter: "agBooleanColumnFilter" },
+      { headerName: "Expected CTC", field: "expectedCTC", hide: hiddenColumns.includes("expectedCTC"), sortable: true, filter: "agNumberColumnFilter" },
+      { headerName: "Notice Period", field: "noticePeriod", hide: hiddenColumns.includes("noticePeriod"), sortable: true, filter: "agNumberColumnFilter" },
+      { headerName: "Application Status", field: "applicationStatus", hide: hiddenColumns.includes("applicationStatus"), sortable: true, filter: "agTextColumnFilter" },
+      { headerName: "Attachment File Extension", field: "attachmentFileExtension", hide: hiddenColumns.includes("attachmentFileExtension"), sortable: true, filter: "agTextColumnFilter" },
     ];
 
     const skillCols = skillNames.map((skill) => ({
@@ -149,21 +176,16 @@ export default function Grid() {
     return [...staticCols, ...skillCols];
   }, [skillNames, hiddenColumns]);
 
-
-
-
-
-  //toogle columns
+  // Toggle columns
   const toggleColumn = (columnName: string) => {
     setHiddenColumns((prev) => {
       const updatedHiddenColumns = prev.includes(columnName)
         ? prev.filter((col) => col !== columnName)
         : [...prev, columnName];
 
-      return updatedHiddenColumns.length > 0 ? updatedHiddenColumns : null;
+      return updatedHiddenColumns.length > 0 ? updatedHiddenColumns : [];
     });
   };
-
 
   useEffect(() => {
     if (gridRef.current) {
@@ -202,7 +224,7 @@ export default function Grid() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64 p-2">
-            {allColumns.map((column) => (
+            {allColumns?.map((column) => (
               <DropdownMenuCheckboxItem
                 key={column}
                 checked={!hiddenColumns.includes(column)}
@@ -227,10 +249,18 @@ export default function Grid() {
             filter: true,
             floatingFilter: true,
           }}
+          onGridReady={(params) => {
+            // Apply the sort model after the grid is ready
+            if (sortModel.length > 0) {
+              params.api?.applyColumnState({
+                state: sortModel,
+                applyOrder: false, // Prevent columns from reordering
+              });
+            }
+          }}
           onPaginationChanged={() => {
             if (gridRef.current) {
               setPageSize(gridRef.current?.api?.paginationGetPageSize().toString());
-
               setPage((gridRef.current?.api?.paginationGetCurrentPage() + 1).toString());
             }
           }}
